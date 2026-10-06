@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>CSVの変更を見る</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.55 system-ui, sans-serif; background: #f5f7fa; color: #182536; }
+    * { box-sizing: border-box; }
+    body { max-width: 1100px; margin: 0 auto; padding: 28px 18px 72px; }
+    h1, h2 { line-height: 1.25; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+    h2 { margin: 0 0 14px; font-size: 1.2rem; }
+    p { margin: 8px 0 18px; }
+    .lead { color: #45566b; max-width: 66ch; }
+    .card { background: white; border: 1px solid #d8e0e9; border-radius: 14px; padding: 22px; margin-top: 22px; box-shadow: 0 4px 18px #152a450b; }
+    .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    label { display: block; font-weight: 650; margin-bottom: 6px; }
+    input[type=file], select { display: block; width: 100%; min-height: 44px; border: 1px solid #9aaabc; border-radius: 8px; padding: 8px; background: white; color: inherit; font: inherit; }
+    button { min-height: 44px; border: 0; border-radius: 8px; background: #155cc1; color: white; padding: 10px 20px; font: inherit; font-weight: 700; cursor: pointer; }
+    button:disabled { background: #8b9aae; cursor: not-allowed; }
+    :focus-visible { outline: 3px solid #f3a721; outline-offset: 2px; }
+    .hint, .meta { color: #52647a; font-size: .93rem; }
+    .status { border-radius: 8px; padding: 12px 14px; margin-top: 16px; background: #eaf2ff; }
+    .status.error { background: #fff0ed; color: #842417; }
+    .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+    .metric { padding: 14px; border-radius: 10px; background: #eef3f9; }
+    .metric strong { display: block; font-size: 1.7rem; line-height: 1.2; }
+    .table-wrap { overflow-x: auto; margin-top: 10px; }
+    .pager { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .pager button { background: #e5eefb; color: #19477c; }
+    .pager button:disabled { background: #e8ebef; color: #627083; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 9px 11px; border-bottom: 1px solid #dce3eb; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 85px; }
+    th { background: #eef3f9; font-weight: 700; }
+    .file-name { font-weight: 700; overflow-wrap: anywhere; }
+    section.result-section { margin-top: 28px; }
+    .empty { color: #52647a; }
+    [hidden] { display: none !important; }
+    @media (max-width: 650px) { .steps { grid-template-columns: 1fr; } .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CSVの変更を見る</h1>
+    <p class="lead">古いCSVと新しいCSVを選び、同じ行を識別できる列を指定してください。追加・削除された行と、変わったセルを表示します。ファイルはこのブラウザ内で処理し、送信しません。</p>
+  </header>
+
+  <main>
+    <section class="card" aria-labelledby="choose-title">
+      <h2 id="choose-title">1. 2つのファイルを選ぶ</h2>
+      <div class="steps">
+        <div><label for="old-file">変更前のCSV</label><input id="old-file" type="file" accept=".csv,text/csv"></div>
+        <div><label for="new-file">変更後のCSV</label><input id="new-file" type="file" accept=".csv,text/csv"></div>
+      </div>
+      <p class="hint">UTF-8・各2 MiBまで。同じ列名が必要です。個人情報を含むファイルは、画面の見える場所で扱う際にもご注意ください。</p>
+      <div id="file-status" class="status" role="status" aria-live="polite">ファイルを2つ選んでください。</div>
+    </section>
+
+    <section class="card" aria-labelledby="key-title">
+      <h2 id="key-title">2. 同じ行を識別する列を選ぶ</h2>
+      <label for="key-column">キー列</label>
+      <select id="key-column" disabled><option value="">先にファイルを選んでください</option></select>
+      <p class="hint">例: id、注文番号。両ファイルで空欄や重複のない列を選んでください。前後の空白も文字として区別します。</p>
+      <button id="compare" type="button" disabled>変更を表示</button>
+    </section>
+
+    <section id="results" class="card" aria-labelledby="result-title" hidden>
+      <h2 id="result-title">比較結果</h2>
+      <p class="meta">変更前: <span id="old-name" class="file-name"></span><br>変更後: <span id="new-name" class="file-name"></span><br>キー列: <span id="key-name" class="file-name"></span></p>
+      <div class="summary" aria-label="変更件数">
+        <div class="metric">追加<strong id="added-count">0</strong></div>
+        <div class="metric">削除<strong id="removed-count">0</strong></div>
+        <div class="metric">変更<strong id="changed-count">0</strong><small>行</small></div>
+        <div class="metric">変更なし<strong id="unchanged-count">0</strong></div>
+      </div>
+      <section class="result-section" aria-labelledby="changed-title"><h2 id="changed-title">変わったセル</h2><div id="changed-detail"></div></section>
+      <section class="result-section" aria-labelledby="added-title"><h2 id="added-title">追加された行</h2><div id="added-detail"></div></section>
+      <section class="result-section" aria-labelledby="removed-title"><h2 id="removed-title">削除された行</h2><div id="removed-detail"></div></section>
+    </section>
+  </main>
+
+  <script id="csv-diff-core">
+    const CsvDiff = (() => {
+      const MAX_BYTES = 2 * 1024 * 1024;
+      const MAX_ROWS = 10000;
+      const MAX_COLUMNS = 50;
+      const MAX_CELL_CHARS = 1000;
+
+      function decodeUtf8(bytes) {
+        if (bytes.byteLength > MAX_BYTES) throw new Error("ファイルが2 MiBを超えています。");
+        try {
+          const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+          return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+        } catch {
+          throw new Error("UTF-8として読み取れません。文字コードを確認してください。");
+        }
+      }
+
+      function parseCsv(input) {
+        const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
+        if (!text) throw new Error("CSVが空です。1行目に列名が必要です。");
+        const records = [];
+        let row = [];
+        let field = "";
+        let state = "start";
+
+        function endField() {
+          if (Array.from(field).length > MAX_CELL_CHARS) throw new Error("1つのセルが1,000文字を超えています。");
+          row.push(field);
+          if (row.length > MAX_COLUMNS) throw new Error("列数が50を超えています。");
+          field = "";
+          state = "start";
+        }
+        function endRow() {
+          endField();
+          records.push(row);
+          if (records.length > MAX_ROWS + 1) throw new Error("データ行が10,000行を超えています。");
+          row = [];
+        }
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          if (state === "quoted") {
+            if (char === '"') {
+              if (text[i + 1] === '"') { field += '"'; i++; }
+              else state = "afterQuote";
+            } else field += char;
+            continue;
+          }
+          if (char === '"') {
+            if (state === "start") { state = "quoted"; continue; }
+            throw new Error("引用符の位置が正しくありません。");
+          }
+          if (char === ",") { endField(); continue; }
+          if (char === "\n" || char === "\r") {
+            if (char === "\r") {
+              if (text[i + 1] !== "\n") throw new Error("改行形式が正しくありません。LFまたはCRLFを使用してください。");
+              i++;
+            }
+            endRow();
+            continue;
+          }
+          if (state === "afterQuote") throw new Error("閉じた引用符の後に余分な文字があります。");
+          field += char;
+          state = "plain";
+        }
+        if (state === "quoted") throw new Error("閉じられていない引用符があります。");
+        if (state !== "start" || row.length || field) endRow();
+        if (!records.length) throw new Error("CSVが空です。1行目に列名が必要です。");
+        const headers = records[0];
+        if (headers.some(value => value === "")) throw new Error("空の列名があります。1行目を確認してください。");
+        if (new Set(headers).size !== headers.length) throw new Error("同じ列名が複数あります。1行目を確認してください。");
+        const rows = records.slice(1);
+        for (const record of rows) {
+          if (record.length !== headers.length) throw new Error("列の数が合わない行があります。");
+        }
+        return { headers, rows };
+      }
+
+      function validatePair(before, after) {
+        if (before.headers.length !== after.headers.length ||
+            before.headers.some(header => !after.headers.includes(header))) {
+          throw new Error("2つのCSVの列名が一致しません。列の追加・削除は比較できません。");
+        }
+        return before.headers;
+      }
+
+      function keyedRows(table, key) {
+        const position = table.headers.indexOf(key);
+        if (position < 0) throw new Error("選んだキー列が見つかりません。");
+        const result = new Map();
+        for (const row of table.rows) {
+          const value = row[position];
+          if (value === "") throw new Error("キー列に空欄があります。別の列を選んでください。");
+          if (result.has(value)) throw new Error("キー列に重複があります。別の列を選んでください。");
+          result.set(value, row);
+        }
+        return result;
+      }
+
+      function compareCsv(before, after, key) {
+        const columns = validatePair(before, after);
+        if (!columns.includes(key)) throw new Error("キー列を選んでください。");
+        const oldRows = keyedRows(before, key);
+        const newRows = keyedRows(after, key);
+        const oldPositions = new Map(before.headers.map((header, index) => [header, index]));
+        const newPositions = new Map(after.headers.map((header, index) => [header, index]));
+        const added = [];
+        const removed = [];
+        const changed = [];
+        let unchanged = 0;
+        for (const [value, row] of oldRows) {
+          if (!newRows.has(value)) {
+            removed.push({ key: value, values: columns.map(column => row[oldPositions.get(column)]) });
+            continue;
+          }
+          const next = newRows.get(value);
+          const cells = [];
+          for (const column of columns) {
+            if (column === key) continue;
+            const oldValue = row[oldPositions.get(column)];
+            const newValue = next[newPositions.get(column)];
+            if (oldValue !== newValue) cells.push({ column, oldValue, newValue });
+          }
+          if (cells.length) changed.push({ key: value, cells });
+          else unchanged++;
+        }
+        for (const [value, row] of newRows) {
+          if (!oldRows.has(value)) added.push({ key: value, values: columns.map(column => row[newPositions.get(column)]) });
+        }
+        return { columns, added, removed, changed, unchanged };
+      }
+
+      return { MAX_BYTES, decodeUtf8, parseCsv, validatePair, compareCsv };
+    })();
+  </script>
+  <script>
+    (() => {
+      const oldInput = document.getElementById("old-file");
+      const newInput = document.getElementById("new-file");
+      const keySelect = document.getElementById("key-column");
+      const compareButton = document.getElementById("compare");
+      const fileStatus = document.getElementById("file-status");
+      const results = document.getElementById("results");
+      let before = null;
+      let after = null;
+      let selectionVersion = 0;
+
+      function status(message, error = false) {
+        fileStatus.textContent = message;
+        fileStatus.classList.toggle("error", error);
+      }
+      function clearResults() {
+        results.hidden = true;
+        for (const id of ["changed-detail", "added-detail", "removed-detail"]) {
+          document.getElementById(id).replaceChildren();
+        }
+      }
+      function clearSelection() {
+        before = null;
+        after = null;
+        keySelect.replaceChildren(new Option("先にファイルを選んでください", ""));
+        keySelect.disabled = true;
+        compareButton.disabled = true;
+        clearResults();
+      }
+      async function readFile(file) {
+        if (file.size > CsvDiff.MAX_BYTES) throw new Error("ファイルが2 MiBを超えています。");
+        const text = CsvDiff.decodeUtf8(await file.arrayBuffer());
+        return CsvDiff.parseCsv(text);
+      }
+      async function inspectFiles() {
+        const version = ++selectionVersion;
+        clearSelection();
+        const oldFile = oldInput.files[0];
+        const newFile = newInput.files[0];
+        if (!oldFile || !newFile) { status("ファイルを2つ選んでください。"); return; }
+        status("ファイルを確認しています…");
+        try {
+          const [oldTable, newTable] = await Promise.all([readFile(oldFile), readFile(newFile)]);
+          if (version !== selectionVersion) return;
+          const columns = CsvDiff.validatePair(oldTable, newTable);
+          before = oldTable;
+          after = newTable;
+          keySelect.replaceChildren(new Option("キー列を選んでください", ""), ...columns.map(column => new Option(column, column)));
+          keySelect.disabled = false;
+          status("2つのCSVを確認しました。キー列を選んでください。");
+        } catch (error) {
+          if (version === selectionVersion) status(error.message, true);
+        }
+      }
+
+      function renderTable(containerId, headers, rows) {
+        const container = document.getElementById(containerId);
+        if (!rows.length) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "該当する行はありません。";
+          container.replaceChildren(empty);
+          return;
+        }
+        const wrapper = document.createElement("div");
+        wrapper.className = "table-wrap";
+        const pager = document.createElement("div");
+        pager.className = "pager";
+        const pageSize = 100;
+        function renderPage(page) {
+          const table = document.createElement("table");
+          const thead = document.createElement("thead");
+          const headerRow = document.createElement("tr");
+          for (const header of headers) {
+            const cell = document.createElement("th");
+            cell.scope = "col";
+            cell.textContent = header;
+            headerRow.append(cell);
+          }
+          thead.append(headerRow);
+          table.append(thead);
+          const tbody = document.createElement("tbody");
+          const start = page * pageSize;
+          for (const values of rows.slice(start, start + pageSize)) {
+            const row = document.createElement("tr");
+            for (const value of values) {
+              const cell = document.createElement("td");
+              cell.textContent = value;
+              row.append(cell);
+            }
+            tbody.append(row);
+          }
+          table.append(tbody);
+          wrapper.replaceChildren(table);
+          pager.replaceChildren();
+          if (rows.length > pageSize) {
+            const previous = document.createElement("button");
+            previous.type = "button";
+            previous.textContent = "前へ";
+            previous.disabled = page === 0;
+            previous.addEventListener("click", () => renderPage(page - 1));
+            const position = document.createElement("span");
+            position.textContent = `${start + 1}〜${Math.min(start + pageSize, rows.length)} / ${rows.length}件`;
+            const next = document.createElement("button");
+            next.type = "button";
+            next.textContent = "次へ";
+            next.disabled = start + pageSize >= rows.length;
+            next.addEventListener("click", () => renderPage(page + 1));
+            pager.append(previous, position, next);
+          }
+        }
+        container.replaceChildren(wrapper, pager);
+        renderPage(0);
+      }
+
+      function showResult(diff, key) {
+        document.getElementById("old-name").textContent = oldInput.files[0].name;
+        document.getElementById("new-name").textContent = newInput.files[0].name;
+        document.getElementById("key-name").textContent = key;
+        document.getElementById("added-count").textContent = diff.added.length;
+        document.getElementById("removed-count").textContent = diff.removed.length;
+        document.getElementById("changed-count").textContent = diff.changed.length;
+        document.getElementById("unchanged-count").textContent = diff.unchanged;
+        renderTable("changed-detail", [key, "列", "変更前", "変更後"],
+          diff.changed.flatMap(row => row.cells.map(cell => [row.key, cell.column, cell.oldValue, cell.newValue])));
+        renderTable("added-detail", diff.columns, diff.added.map(row => row.values));
+        renderTable("removed-detail", diff.columns, diff.removed.map(row => row.values));
+        results.hidden = false;
+      }
+
+      oldInput.addEventListener("change", inspectFiles);
+      newInput.addEventListener("change", inspectFiles);
+      keySelect.addEventListener("change", () => { clearResults(); compareButton.disabled = !before || !after || !keySelect.value; });
+      compareButton.addEventListener("click", () => {
+        clearResults();
+        try {
+          const diff = CsvDiff.compareCsv(before, after, keySelect.value);
+          showResult(diff, keySelect.value);
+          status("比較が完了しました。");
+        } catch (error) { status(error.message, true); }
+      });
+    })();
+  </script>
+</body>
+</html>
