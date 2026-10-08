@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="行の順番が違う2つのCSVを、商品番号などで比べます。追加・削除された行と変わったセルを表示。入力ファイルは外部に送信しません。">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>CSVの変更を見る</title>
   <style>
@@ -44,7 +45,9 @@
 <body>
   <header>
     <h1>CSVの変更を見る</h1>
-    <p class="lead">古いCSVと新しいCSVを選び、同じ行を識別できる列を指定してください。追加・削除された行と、変わったセルを表示します。ファイルはこのブラウザ内で処理し、送信しません。</p>
+    <p class="lead">昨日と今日のCSVを、商品番号などを目印にして比べます。行の順番が違っても、追加・削除された行と変わったセルを確認できます。ファイルの中身は外部に送信しません。</p>
+    <button id="try-sample" type="button">架空の商品一覧で試す</button>
+    <p class="hint">ファイルを用意しなくても試せます。選択中のファイルがある場合は、選択を解除してサンプルを表示します。</p>
   </header>
 
   <main>
@@ -60,7 +63,7 @@
 
     <section class="card" aria-labelledby="key-title">
       <h2 id="key-title">2. 同じ行を識別する列を選ぶ</h2>
-      <label for="key-column">キー列</label>
+      <label for="key-column">行を見分ける列（キー列）</label>
       <select id="key-column" disabled><option value="">先にファイルを選んでください</option></select>
       <p class="hint">例: id、注文番号。両ファイルで空欄や重複のない列を選んでください。前後の空白も文字として区別します。</p>
       <button id="compare" type="button" disabled>変更を表示</button>
@@ -80,6 +83,10 @@
       <section class="result-section" aria-labelledby="removed-title"><h2 id="removed-title">削除された行</h2><div id="removed-detail"></div></section>
     </section>
   </main>
+  <footer class="hint">
+    <p><a href="https://github.com/supportapp3-lab/csv-diff-viewer">ソースコードを見る</a> · <a href="https://qiita.com/supportapp3/items/0f11d10977bcbc89f756">説明を読む（Qiita）</a></p>
+    <p>入力ファイルの内容を保存・送信する機能や、アクセス解析はありません。</p>
+  </footer>
 
   <script id="csv-diff-core">
     const CsvDiff = (() => {
@@ -226,6 +233,8 @@
       let before = null;
       let after = null;
       let selectionVersion = 0;
+      let beforeName = "";
+      let afterName = "";
 
       function status(message, error = false) {
         fileStatus.textContent = message;
@@ -240,6 +249,8 @@
       function clearSelection() {
         before = null;
         after = null;
+        beforeName = "";
+        afterName = "";
         keySelect.replaceChildren(new Option("先にファイルを選んでください", ""));
         keySelect.disabled = true;
         compareButton.disabled = true;
@@ -263,6 +274,8 @@
           const columns = CsvDiff.validatePair(oldTable, newTable);
           before = oldTable;
           after = newTable;
+          beforeName = oldFile.name;
+          afterName = newFile.name;
           keySelect.replaceChildren(new Option("キー列を選んでください", ""), ...columns.map(column => new Option(column, column)));
           keySelect.disabled = false;
           status("2つのCSVを確認しました。キー列を選んでください。");
@@ -332,8 +345,8 @@
       }
 
       function showResult(diff, key) {
-        document.getElementById("old-name").textContent = oldInput.files[0].name;
-        document.getElementById("new-name").textContent = newInput.files[0].name;
+        document.getElementById("old-name").textContent = beforeName;
+        document.getElementById("new-name").textContent = afterName;
         document.getElementById("key-name").textContent = key;
         document.getElementById("added-count").textContent = diff.added.length;
         document.getElementById("removed-count").textContent = diff.removed.length;
@@ -349,13 +362,30 @@
       oldInput.addEventListener("change", inspectFiles);
       newInput.addEventListener("change", inspectFiles);
       keySelect.addEventListener("change", () => { clearResults(); compareButton.disabled = !before || !after || !keySelect.value; });
-      compareButton.addEventListener("click", () => {
+      function compareSelected() {
         clearResults();
         try {
           const diff = CsvDiff.compareCsv(before, after, keySelect.value);
           showResult(diff, keySelect.value);
           status("比較が完了しました。");
         } catch (error) { status(error.message, true); }
+      }
+      compareButton.addEventListener("click", compareSelected);
+      document.getElementById("try-sample").addEventListener("click", () => {
+        ++selectionVersion;
+        oldInput.value = "";
+        newInput.value = "";
+        clearSelection();
+        before = CsvDiff.parseCsv("商品番号,商品名,価格,状態\nP101,コーヒー,500,販売中\nP102,紅茶,400,販売中\nP103,ミルク,180,販売中\n");
+        after = CsvDiff.parseCsv("商品番号,商品名,価格,状態\nP103,ミルク,180,販売中\nP101,コーヒー,550,販売中\nP104,緑茶,350,販売中\n");
+        beforeName = "架空の商品一覧（変更前）";
+        afterName = "架空の商品一覧（変更後）";
+        keySelect.replaceChildren(...before.headers.map(column => new Option(column, column)));
+        keySelect.disabled = false;
+        keySelect.value = "商品番号";
+        compareButton.disabled = false;
+        compareSelected();
+        status("架空のサンプルを表示しました。価格が変わった商品と、追加・削除された商品を確認できます。");
       });
     })();
   </script>

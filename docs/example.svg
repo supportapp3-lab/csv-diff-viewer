@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+<title id="title">商品番号で比べた架空CSVの結果</title><desc id="desc">追加1行、削除1行、変更1行、変更なし1行。P101の価格が500から550に変わった。</desc>
+<rect width="1200" height="430" rx="18" fill="#f5f7fa"/>
+<g font-family="sans-serif" fill="#182536">
+<text x="40" y="55" font-size="28" font-weight="700">商品番号で比べると、行の順番が違っても変更が分かる</text>
+<text x="40" y="90" font-size="18" fill="#52647a">架空の商品一覧を比較した例</text>
+<rect x="40" y="120" width="260" height="100" rx="12" fill="#eaf2ff"/><text x="62" y="154" font-size="20">追加</text><text x="62" y="198" font-size="34" font-weight="700">1行</text>
+<rect x="325" y="120" width="260" height="100" rx="12" fill="#eaf2ff"/><text x="347" y="154" font-size="20">削除</text><text x="347" y="198" font-size="34" font-weight="700">1行</text>
+<rect x="610" y="120" width="260" height="100" rx="12" fill="#fff3db"/><text x="632" y="154" font-size="20">変更</text><text x="632" y="198" font-size="34" font-weight="700">1行</text>
+<rect x="895" y="120" width="260" height="100" rx="12" fill="#eaf2ff"/><text x="917" y="154" font-size="20">変更なし</text><text x="917" y="198" font-size="34" font-weight="700">1行</text>
+<text x="40" y="268" font-size="23" font-weight="700">変わったセル</text>
+<rect x="40" y="288" width="1115" height="44" rx="6" fill="#e5edf7"/>
+<text x="62" y="318" font-size="19">商品番号</text><text x="360" y="318" font-size="19">列</text><text x="650" y="318" font-size="19">変更前</text><text x="945" y="318" font-size="19">変更後</text>
+<text x="62" y="378" font-size="23">P101</text><text x="360" y="378" font-size="23">価格</text><text x="650" y="378" font-size="23">500</text><text x="945" y="378" font-size="23" fill="#155cc1" font-weight="700">550</text>
+</g></svg>
+
