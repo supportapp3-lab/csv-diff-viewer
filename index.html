@@ -78,6 +78,10 @@
         <div class="metric">変更<strong id="changed-count">0</strong><small>行</small></div>
         <div class="metric">変更なし<strong id="unchanged-count">0</strong></div>
       </div>
+      <button id="save-report" type="button" disabled>比較結果をHTMLで保存</button>
+      <p class="hint">保存したファイルはブラウザで開けます。画面のページを切り替えなくても、変わったセルと追加・削除された行をすべて保存します。変更なしの行は件数だけです。</p>
+      <p class="hint">結果にはファイル名と比較した値が含まれます。人に渡す前に、内容を確認してください。</p>
+      <p id="report-status" class="hint" role="status" aria-live="polite"></p>
       <section class="result-section" aria-labelledby="changed-title"><h2 id="changed-title">変わったセル</h2><div id="changed-detail"></div></section>
       <section class="result-section" aria-labelledby="added-title"><h2 id="added-title">追加された行</h2><div id="added-detail"></div></section>
       <section class="result-section" aria-labelledby="removed-title"><h2 id="removed-title">削除された行</h2><div id="removed-detail"></div></section>
@@ -85,7 +89,7 @@
   </main>
   <footer class="hint">
     <p><a href="https://github.com/supportapp3-lab/csv-diff-viewer">ソースコードを見る</a> · <a href="https://qiita.com/supportapp3/items/0f11d10977bcbc89f756">説明を読む（Qiita）</a></p>
-    <p>入力ファイルの内容を保存・送信する機能や、アクセス解析はありません。</p>
+    <p>入力ファイルを外部へ送信する機能や、アクセス解析はありません。保存ボタンを押したときだけ、比較結果を端末にダウンロードします。</p>
   </footer>
 
   <script id="csv-diff-core">
@@ -222,6 +226,80 @@
       return { MAX_BYTES, decodeUtf8, parseCsv, validatePair, compareCsv };
     })();
   </script>
+  <script id="csv-diff-report">
+    const CsvDiffReport = (() => {
+      const MAX_REPORT_BYTES = 8 * 1024 * 1024;
+      const SIZE_ERROR = "保存するHTMLが8 MiBを超えています。CSVを小さく分けて比較してください。結果の一部だけを保存することはありません。";
+
+      function escapeHtml(value) {
+        const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+        return String(value).replace(/[&<>"']/g, char => entities[char]);
+      }
+
+      function create(snapshot) {
+        const { diff, key, beforeName, afterName, comparedAt, isSample } = snapshot;
+        const parts = [];
+        const encoder = new TextEncoder();
+        let bytes = 0;
+        function append(part) {
+          bytes += encoder.encode(part).byteLength;
+          if (bytes > MAX_REPORT_BYTES) throw new Error(SIZE_ERROR);
+          parts.push(part);
+        }
+        function cell(value) {
+          return value === "" ? '<span class="empty-cell">（空欄）</span>' : escapeHtml(value);
+        }
+        function table(title, headers, rows) {
+          append(`<section><h2>${escapeHtml(title)}</h2>`);
+          let started = false;
+          for (const values of rows) {
+            if (!started) {
+              append('<div class="table-wrap"><table><thead><tr>');
+              for (const header of headers) append(`<th scope="col">${escapeHtml(header)}</th>`);
+              append('</tr></thead><tbody>');
+              started = true;
+            }
+            append('<tr>');
+            for (const value of values) append(`<td>${cell(value)}</td>`);
+            append('</tr>');
+          }
+          append(started ? '</tbody></table></div></section>' : '<p>該当する行はありません。</p></section>');
+        }
+        function* changes() {
+          for (const row of diff.changed) {
+            for (const item of row.cells) yield [row.key, item.column, item.oldValue, item.newValue];
+          }
+        }
+        function* rowValues(rows) {
+          for (const row of rows) yield row.values;
+        }
+        append(`<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>CSVの比較結果</title><style>
+body{max-width:1100px;margin:0 auto;padding:24px;font:16px/1.6 system-ui,sans-serif;color:#182536;background:#fff}
+h1,h2{line-height:1.3}h1{font-size:1.8rem}h2{font-size:1.2rem}section{margin-top:28px}
+.metadata{white-space:pre-wrap;overflow-wrap:anywhere}.summary{display:flex;flex-wrap:wrap;gap:16px;padding:16px;background:#eef3f9}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left}
+th,td{padding:9px 11px;border:1px solid #dce3eb;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;min-width:85px}
+th{background:#eef3f9}.empty-cell{color:#52647a;font-style:italic}.note{color:#52647a}
+@media print{body{padding:0;font-size:10pt}.table-wrap{overflow:visible}thead{display:table-header-group}tr{break-inside:avoid}}
+</style></head><body><h1>CSVの比較結果</h1>`);
+        if (isSample) append('<p class="note">架空の商品一覧を使ったサンプルです。</p>');
+        append(`<p class="metadata">変更前：${escapeHtml(beforeName)}<br>変更後：${escapeHtml(afterName)}<br>行を照合した列：${escapeHtml(key)}<br>比較した日時：<time datetime="${escapeHtml(comparedAt.toISOString())}">${escapeHtml(comparedAt.toLocaleString("ja-JP", { timeZoneName: "short" }))}</time></p>`);
+        append(`<div class="summary"><span>追加：${diff.added.length}行</span><span>削除：${diff.removed.length}行</span><span>変更：${diff.changed.length}行</span><span>変更なし：${diff.unchanged}行</span></div>`);
+        append('<p class="note">同じキーの行を、セルの文字が一致するかで比較した結果です。変更の理由や、予定した変更かどうかは判定していません。キーの値が変わった行は、削除と追加として表示します。</p>');
+        table("変わったセル", [key, "列", "変更前", "変更後"], changes());
+        table("追加された行", diff.columns, rowValues(diff.added));
+        table("削除された行", diff.columns, rowValues(diff.removed));
+        append('<p class="note">変わったセルと追加・削除された行は、画面の表示ページにかかわらずすべて含まれます。変更なしの行は件数のみです。空のセルは灰色の「（空欄）」で示します。</p><p class="note">このファイルには入力ファイル名と比較した値が含まれます。相手に渡す前に内容を確認してください。外部への送信やスクリプトの実行は行いません。</p></body></html>');
+        return parts.join("");
+      }
+
+      return { create, SIZE_ERROR };
+    })();
+  </script>
   <script>
     (() => {
       const oldInput = document.getElementById("old-file");
@@ -230,23 +308,31 @@
       const compareButton = document.getElementById("compare");
       const fileStatus = document.getElementById("file-status");
       const results = document.getElementById("results");
+      const saveReportButton = document.getElementById("save-report");
+      const reportStatus = document.getElementById("report-status");
       let before = null;
       let after = null;
       let selectionVersion = 0;
       let beforeName = "";
       let afterName = "";
+      let reportSnapshot = null;
+      let isSample = false;
 
       function status(message, error = false) {
         fileStatus.textContent = message;
         fileStatus.classList.toggle("error", error);
       }
       function clearResults() {
+        reportSnapshot = null;
+        saveReportButton.disabled = true;
+        reportStatus.textContent = "";
         results.hidden = true;
         for (const id of ["changed-detail", "added-detail", "removed-detail"]) {
           document.getElementById(id).replaceChildren();
         }
       }
       function clearSelection() {
+        isSample = false;
         before = null;
         after = null;
         beforeName = "";
@@ -356,8 +442,32 @@
           diff.changed.flatMap(row => row.cells.map(cell => [row.key, cell.column, cell.oldValue, cell.newValue])));
         renderTable("added-detail", diff.columns, diff.added.map(row => row.values));
         renderTable("removed-detail", diff.columns, diff.removed.map(row => row.values));
+        reportSnapshot = { diff, key, beforeName, afterName, comparedAt: new Date(), isSample };
+        saveReportButton.disabled = false;
         results.hidden = false;
       }
+
+      saveReportButton.addEventListener("click", () => {
+        if (!reportSnapshot) return;
+        let objectUrl = null;
+        try {
+          const html = CsvDiffReport.create(reportSnapshot);
+          objectUrl = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+          const link = document.createElement("a");
+          link.href = objectUrl;
+          link.download = `csv-diff-report-${reportSnapshot.comparedAt.toISOString().replace(/[:.]/g, "-")}.html`;
+          link.hidden = true;
+          document.body.append(link);
+          try { link.click(); } finally { link.remove(); }
+          const downloadUrl = objectUrl;
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000);
+          reportStatus.textContent = "比較結果のダウンロードを開始しました。";
+        } catch (error) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          reportStatus.textContent = error.message === CsvDiffReport.SIZE_ERROR
+            ? CsvDiffReport.SIZE_ERROR : "比較結果を保存できませんでした。ブラウザのダウンロード設定を確認してください。";
+        }
+      });
 
       oldInput.addEventListener("change", inspectFiles);
       newInput.addEventListener("change", inspectFiles);
@@ -380,6 +490,7 @@
         after = CsvDiff.parseCsv("商品番号,商品名,価格,状態\nP103,ミルク,180,販売中\nP101,コーヒー,550,販売中\nP104,緑茶,350,販売中\n");
         beforeName = "架空の商品一覧（変更前）";
         afterName = "架空の商品一覧（変更後）";
+        isSample = true;
         keySelect.replaceChildren(...before.headers.map(column => new Option(column, column)));
         keySelect.disabled = false;
         keySelect.value = "商品番号";
