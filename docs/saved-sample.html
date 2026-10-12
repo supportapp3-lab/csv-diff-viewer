@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>CSVの比較結果</title><style>
+body{max-width:1100px;margin:0 auto;padding:24px;font:16px/1.6 system-ui,sans-serif;color:#182536;background:#fff}
+h1,h2{line-height:1.3}h1{font-size:1.8rem}h2{font-size:1.2rem}section{margin-top:28px}
+.metadata{white-space:pre-wrap;overflow-wrap:anywhere}.summary{display:flex;flex-wrap:wrap;gap:16px;padding:16px;background:#eef3f9}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left}
+th,td{padding:9px 11px;border:1px solid #dce3eb;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;min-width:85px}
+th{background:#eef3f9}.empty-cell{color:#52647a;font-style:italic}.note{color:#52647a}
+@media print{body{padding:0;font-size:10pt}.table-wrap{overflow:visible}thead{display:table-header-group}tr{break-inside:avoid}}
+</style></head><body><h1>CSVの比較結果</h1><p class="note">架空の商品一覧を使ったサンプルです。</p><p class="metadata">変更前：架空の商品一覧（変更前）<br>変更後：架空の商品一覧（変更後）<br>行を照合した列：商品番号<br>比較した日時：<time datetime="2026-10-12T03:43:51.187Z">2026/10/12 12:43:51 JST</time></p><div class="summary"><span>追加：1行</span><span>削除：1行</span><span>変更：1行</span><span>変更なし：1行</span></div><p class="note">同じキーの行を、セルの文字が一致するかで比較した結果です。変更の理由や、予定した変更かどうかは判定していません。キーの値が変わった行は、削除と追加として表示します。</p><section><h2>変わったセル</h2><div class="table-wrap"><table><thead><tr><th scope="col">商品番号</th><th scope="col">列</th><th scope="col">変更前</th><th scope="col">変更後</th></tr></thead><tbody><tr><td>P101</td><td>価格</td><td>500</td><td>550</td></tr></tbody></table></div></section><section><h2>追加された行</h2><div class="table-wrap"><table><thead><tr><th scope="col">商品番号</th><th scope="col">商品名</th><th scope="col">価格</th><th scope="col">状態</th></tr></thead><tbody><tr><td>P104</td><td>緑茶</td><td>350</td><td>販売中</td></tr></tbody></table></div></section><section><h2>削除された行</h2><div class="table-wrap"><table><thead><tr><th scope="col">商品番号</th><th scope="col">商品名</th><th scope="col">価格</th><th scope="col">状態</th></tr></thead><tbody><tr><td>P102</td><td>紅茶</td><td>400</td><td>販売中</td></tr></tbody></table></div></section><p class="note">変わったセルと追加・削除された行は、画面の表示ページにかかわらずすべて含まれます。変更なしの行は件数のみです。空のセルは灰色の「（空欄）」で示します。</p><p class="note">このファイルには入力ファイル名と比較した値が含まれます。相手に渡す前に内容を確認してください。外部への送信やスクリプトの実行は行いません。</p></body></html>

@@ -11,9 +11,12 @@ const core = vm.runInNewContext(`${coreScript}\nCsvDiff`, { TextDecoder });
 const plain = value => JSON.parse(JSON.stringify(value));
 const table = value => core.parseCsv(value);
 
-test("both inline scripts parse without a build step", () => {
+test("core, report and UI inline scripts parse without a build step", () => {
   const scripts = [...html.matchAll(/<script(?: id="[^"]+")?>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 2);
+  assert.equal(scripts.length, 3);
+  assert.match(scripts[0][0], /id="csv-diff-core"/);
+  assert.match(scripts[1][0], /id="csv-diff-report"/);
+  assert.ok(scripts[2][0].startsWith("<script>"));
   for (const script of scripts) assert.doesNotThrow(() => new vm.Script(script[1]));
 });
 
